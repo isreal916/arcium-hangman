@@ -193,7 +193,7 @@ function App() {
           <p className="mb-4 text-purple-300">{getFeedback()}</p>
 
           {/* Show missed words */}
-          <div className="mb-4 bg-gray-900 p-4 rounded border border-purple-600 text-left">
+         { !(score === WORDS.length) && <div className="mb-4 bg-gray-900 p-4 rounded border border-purple-600 text-left">
             <h3 className="text-lg mb-2">Words you missed:</h3>
             <ul className="list-disc list-inside">
               {shuffledWords
@@ -213,7 +213,7 @@ function App() {
                   </li>
                 ))}
             </ul>
-          </div>
+          </div>}
 
           <button
             onClick={resetGame}
