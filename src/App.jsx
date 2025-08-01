@@ -6,7 +6,6 @@ import wronganswer from "./assets/wronganswer-37702.mp3";
 import "./App.css";
 
 const MAX_WRONG = 6;
-const ROUND_TIME = 60;
 
 function App() {
   const [shuffledWords, setShuffledWords] = useState([]);
@@ -15,16 +14,17 @@ function App() {
   const [guessedLetters, setGuessedLetters] = useState([]);
   const [wrongGuesses, setWrongGuesses] = useState(0);
   const [gameStatus, setGameStatus] = useState("start");
-  const [timeLeft, setTimeLeft] = useState(ROUND_TIME);
   const [score, setScore] = useState(0);
-  const tickRef = useRef();
   const audioRef = useRef(null);
+  const wrongAudioRef = useRef(null);
 
+  // Shuffle words once at start or reset
   useEffect(() => {
     const shuffled = [...WORDS].sort(() => Math.random() - 0.5);
     setShuffledWords(shuffled);
   }, []);
 
+  // Update current word data when wordIndex or shuffledWords change
   useEffect(() => {
     if (gameStatus === "playing" && shuffledWords.length > 0) {
       setWordData({
@@ -34,28 +34,14 @@ function App() {
     }
   }, [wordIndex, shuffledWords, gameStatus]);
 
-  useEffect(() => {
-    if (gameStatus === "playing" && timeLeft > 0) {
-      tickRef.current = setInterval(() => {
-        setTimeLeft((t) => t - 1);
-      }, 1000);
-    }
-    return () => clearInterval(tickRef.current);
-  }, [gameStatus]);
-
-  useEffect(() => {
-    if (timeLeft <= 0 && gameStatus === "playing") {
-      setGameStatus("end");
-      clearInterval(tickRef.current);
-    }
-  }, [timeLeft, gameStatus]);
-
+  // Check win or loss on guessed letters or wrong guesses update
   useEffect(() => {
     const didWin =
       wordData.word &&
       wordData.word
         .split("")
         .every((letter) => guessedLetters.includes(letter));
+
     if (didWin) {
       audioRef.current?.play();
       setScore((prev) => prev + 1);
@@ -64,13 +50,12 @@ function App() {
           setWordIndex((i) => i + 1);
           setGuessedLetters([]);
           setWrongGuesses(0);
-          setTimeLeft((t) => t + 10);
         } else {
           setGameStatus("end");
-          clearInterval(tickRef.current);
         }
       }, 1000);
     }
+
     if (wrongGuesses >= MAX_WRONG) {
       if (wordIndex + 1 < shuffledWords.length) {
         setTimeout(() => {
@@ -80,24 +65,24 @@ function App() {
         }, 1000);
       } else {
         setGameStatus("end");
-        clearInterval(tickRef.current);
       }
     }
   }, [guessedLetters, wrongGuesses, wordData.word, wordIndex, shuffledWords]);
-const getFeedback = () => {
-  const total = WORDS.length;
-  const percent = (score / total) * 100;
 
-  if (score === total) return "👑 You are a true Arcian,One latina for you";
-  if (score >= 11) return " Almost flawless,";
-  if (score >= 8) return " Impressive ";
-  if (score >= 5) return " You're getting there! Good effort.";
-  return "😢 Keep learning Arcian";
-};
+  // Grading feedback based on score
+  const getFeedback = () => {
+    const total = WORDS.length;
+    if (score === total) return "👑 You are a true Arcian, One latina for you";
+    if (score >= 11) return "Almost flawless!";
+    if (score >= 8) return "Impressive!";
+    if (score >= 5) return "You're getting there! Good effort.";
+    return "😢 Keep learning Arcian!";
+  };
+
   const handleGuess = (letter) => {
     if (gameStatus !== "playing" || guessedLetters.includes(letter)) return;
     setGuessedLetters((prev) => [...prev, letter]);
-    if (!wordData.word.includes(letter)) setWrongGuesses((prev) => prev + 1);
+    if (!wordData.word.includes(letter)){ setWrongGuesses((prev) => prev + 1); wrongAudioRef.current?.play(); }
   };
 
   const renderWord = () => {
@@ -119,7 +104,6 @@ const getFeedback = () => {
     setWrongGuesses(0);
     setGameStatus("playing");
     setScore(0);
-    setTimeLeft(ROUND_TIME);
   };
 
   const letters = "abcdefghijklmnopqrstuvwxyz".split("");
@@ -127,6 +111,7 @@ const getFeedback = () => {
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6">
       <audio ref={audioRef} src={rightanswer} />
+      <audio ref={wrongAudioRef} src={wronganswer} />
 
       {gameStatus === "start" && (
         <div className="text-center">
@@ -148,10 +133,15 @@ const getFeedback = () => {
             Hint: {wordData.hint}
           </div>
 
-          <div className="mb-2 text-yellow-400">Time left: {timeLeft}s</div>
-
-          <div className="mb-4">
-            Wrong guesses: {wrongGuesses} / {MAX_WRONG}
+          {/* Lives as hearts */}
+          <div className="mb-4 text-xl text-red-500">
+            Lives left:{" "}
+            {Array.from({ length: MAX_WRONG - wrongGuesses }).map((_, idx) => (
+              <span key={idx}>❤️</span>
+            ))}
+            {Array.from({ length: wrongGuesses }).map((_, idx) => (
+              <span key={idx}>🤍</span>
+            ))}
           </div>
 
           <div className="mb-6 text-center">{renderWord()}</div>
