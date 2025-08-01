@@ -226,7 +226,7 @@ function App() {
 
       {/* Footer banner */}
       <footer className="mt-8 text-center text-purple-600 text-xs italic select-none">
-        Made with ❤️  for the Arcium community
+        Created with ❤️ By REAL  for the Arcium community
       </footer>
     </div>
   );
