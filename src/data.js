@@ -10,4 +10,6 @@
   { word: "cerberus", hint: "MPC model that operate under a 'dishonest majority' model" },
   { word: "arcium", hint: "the encrypted super computer" },
   { word: "yannik", hint: "Ceo of encryption" },
+  { word: "extracted", hint: "Encrypted,not -------" },
+  { word: "umbrella", hint: "Under the -------" },
 ];
