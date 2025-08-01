@@ -5,13 +5,14 @@ import rightanswer from "./assets/rightanswer-95219.mp3";
 import wronganswer from "./assets/wronganswer-37702.mp3";
 import "./App.css";
 
-const MAX_WRONG = 6;
+const MAX_WRONG = 4;
 
 function App() {
   const [shuffledWords, setShuffledWords] = useState([]);
   const [wordIndex, setWordIndex] = useState(0);
   const [wordData, setWordData] = useState({ word: "", hint: "" });
-  const [guessedLetters, setGuessedLetters] = useState([]);
+  // Track guessed letters per word index
+  const [guessedLettersByWord, setGuessedLettersByWord] = useState({});
   const [wrongGuesses, setWrongGuesses] = useState(0);
   const [gameStatus, setGameStatus] = useState("start");
   const [score, setScore] = useState(0);
@@ -31,16 +32,18 @@ function App() {
         word: shuffledWords[wordIndex]?.word.toLowerCase(),
         hint: shuffledWords[wordIndex]?.hint,
       });
+      setWrongGuesses(0);
     }
   }, [wordIndex, shuffledWords, gameStatus]);
 
   // Check win or loss on guessed letters or wrong guesses update
   useEffect(() => {
-    const didWin =
-      wordData.word &&
-      wordData.word
-        .split("")
-        .every((letter) => guessedLetters.includes(letter));
+    if (!wordData.word) return;
+
+    const currentGuessed = guessedLettersByWord[wordIndex] || [];
+    const didWin = wordData.word
+      .split("")
+      .every((letter) => currentGuessed.includes(letter));
 
     if (didWin) {
       audioRef.current?.play();
@@ -48,7 +51,6 @@ function App() {
       setTimeout(() => {
         if (wordIndex + 1 < shuffledWords.length) {
           setWordIndex((i) => i + 1);
-          setGuessedLetters([]);
           setWrongGuesses(0);
         } else {
           setGameStatus("end");
@@ -58,16 +60,14 @@ function App() {
 
     if (wrongGuesses >= MAX_WRONG) {
       if (wordIndex + 1 < shuffledWords.length) {
-        setTimeout(() => {
-          setWordIndex((i) => i + 1);
-          setGuessedLetters([]);
+         setWordIndex((i) => i + 1);
           setWrongGuesses(0);
-        }, 1000);
+       
       } else {
         setGameStatus("end");
       }
     }
-  }, [guessedLetters, wrongGuesses, wordData.word, wordIndex, shuffledWords]);
+  }, [guessedLettersByWord, wrongGuesses, wordData.word, wordIndex, shuffledWords]);
 
   // Grading feedback based on score
   const getFeedback = () => {
@@ -80,12 +80,24 @@ function App() {
   };
 
   const handleGuess = (letter) => {
-    if (gameStatus !== "playing" || guessedLetters.includes(letter)) return;
-    setGuessedLetters((prev) => [...prev, letter]);
-    if (!wordData.word.includes(letter)){ setWrongGuesses((prev) => prev + 1); wrongAudioRef.current?.play(); }
+    if (gameStatus !== "playing") return;
+
+    const currentGuessed = guessedLettersByWord[wordIndex] || [];
+    if (currentGuessed.includes(letter)) return;
+
+    const newGuessed = [...currentGuessed, letter];
+    setGuessedLettersByWord((prev) => ({
+      ...prev,
+      [wordIndex]: newGuessed,
+    }));
+
+    if (!wordData.word.includes(letter)) {
+      setWrongGuesses((prev) => prev + 1);
+      wrongAudioRef.current?.play();
+    }
   };
 
-  const renderWord = () => {
+  const renderWord = (guessedLetters) => {
     return wordData.word.split("").map((letter, idx) => (
       <span
         key={idx}
@@ -100,13 +112,14 @@ function App() {
     const reshuffled = [...WORDS].sort(() => Math.random() - 0.5);
     setShuffledWords(reshuffled);
     setWordIndex(0);
-    setGuessedLetters([]);
+    setGuessedLettersByWord({});
     setWrongGuesses(0);
     setGameStatus("playing");
     setScore(0);
   };
 
   const letters = "abcdefghijklmnopqrstuvwxyz".split("");
+  const currentGuessedLetters = guessedLettersByWord[wordIndex] || [];
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6">
@@ -133,6 +146,10 @@ function App() {
             Hint: {wordData.hint}
           </div>
 
+          <div className="mb-2 text-gray-400 text-sm italic text-center max-w-md">
+            Question {wordIndex + 1} / {shuffledWords.length}
+          </div>
+
           {/* Lives as hearts */}
           <div className="mb-4 text-xl text-red-500">
             Lives left:{" "}
@@ -144,16 +161,16 @@ function App() {
             ))}
           </div>
 
-          <div className="mb-6 text-center">{renderWord()}</div>
+          <div className="mb-6 text-center">{renderWord(currentGuessedLetters)}</div>
 
           <div className="grid grid-cols-6 sm:grid-cols-7 gap-2 sm:gap-3 max-w-xs sm:max-w-lg w-full">
             {letters.map((letter) => (
               <button
                 key={letter}
                 onClick={() => handleGuess(letter)}
-                disabled={guessedLetters.includes(letter)}
+                disabled={currentGuessedLetters.includes(letter)}
                 className={`py-2 sm:py-3 px-3 sm:px-4 text-base sm:text-lg rounded transition ${
-                  guessedLetters.includes(letter)
+                  currentGuessedLetters.includes(letter)
                     ? wordData.word.includes(letter)
                       ? "bg-green-600 animate-bounce"
                       : "bg-red-600 animate-shake"
@@ -168,12 +185,35 @@ function App() {
       )}
 
       {gameStatus === "end" && (
-        <div className="mt-6 text-center animate-fade-in">
+        <div className="mt-6 text-center animate-fade-in max-w-md mx-auto">
           <h2 className="text-2xl mb-2">Game Over</h2>
           <p className="mb-1 font-bold">
-            Total Guessed Words: {score}/{WORDS.length}
+            Total Guessed Words: {score} / {WORDS.length}
           </p>
           <p className="mb-4 text-purple-300">{getFeedback()}</p>
+
+          {/* Show missed words */}
+          <div className="mb-4 bg-gray-900 p-4 rounded border border-purple-600 text-left">
+            <h3 className="text-lg mb-2">Words you missed:</h3>
+            <ul className="list-disc list-inside">
+              {shuffledWords
+                .map(({ word, hint }, index) => {
+                  const guessed = word
+                    .toLowerCase()
+                    .split("")
+                    .every((letter) =>
+                      (guessedLettersByWord[index] || []).includes(letter)
+                    );
+                  return { word, hint, guessed };
+                })
+                .filter(({ guessed }) => !guessed)
+                .map(({ word, hint }) => (
+                  <li key={word}>
+                    <strong>{word}</strong> — {hint}
+                  </li>
+                ))}
+            </ul>
+          </div>
 
           <button
             onClick={resetGame}
@@ -183,6 +223,11 @@ function App() {
           </button>
         </div>
       )}
+
+      {/* Footer banner */}
+      <footer className="mt-8 text-center text-purple-600 text-xs italic select-none">
+        Made with ❤️  for the Arcium community
+      </footer>
     </div>
   );
 }
