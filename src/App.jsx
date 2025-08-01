@@ -1,35 +1,15 @@
 // src/App.jsx
 import React, { useState, useEffect, useRef } from "react";
+import { WORDS } from "./data";
+import rightanswer from "./assets/rightanswer-95219.mp3";
+import wronganswer from "./assets/wronganswer-37702.mp3";
 import "./App.css";
 
-const ORIGINAL_WORDS = [
-  { word: "privacy", hint: "What should be default" },
-  { word: "gmpc", hint: "community greeting" },
-  { word: "manticore", hint: "MPC model that operate under a 'honest but curious' model" },
-  { word: "loosty", hint: " Arcium community head" },
-  { word: "mpc", hint: "Arcium main cryptographic technology" },
-  { word: "encrypted", hint: "brand statement used often with <> symbol" },
-  { word: "miebi", hint: "queen of fooling" },
-  { word: "purple", hint: "arcium brand color" },
-  { word: "cerberus", hint: "MPC model that operate under a 'dishonest majority' model" },
-  { word: "arcium", hint: "the encrypted super computer" },
-  { word: "yannik", hint: "Ceo of encryption" },
-];
-
 const MAX_WRONG = 6;
-const ROUND_TIME = 60; // seconds
-
-const shuffle = (arr) => {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-};
+const ROUND_TIME = 60;
 
 function App() {
-  const [wordList, setWordList] = useState(shuffle(ORIGINAL_WORDS));
+  const [shuffledWords, setShuffledWords] = useState([]);
   const [wordIndex, setWordIndex] = useState(0);
   const [wordData, setWordData] = useState({ word: "", hint: "" });
   const [guessedLetters, setGuessedLetters] = useState([]);
@@ -39,6 +19,20 @@ function App() {
   const [score, setScore] = useState(0);
   const tickRef = useRef();
   const audioRef = useRef(null);
+
+  useEffect(() => {
+    const shuffled = [...WORDS].sort(() => Math.random() - 0.5);
+    setShuffledWords(shuffled);
+  }, []);
+
+  useEffect(() => {
+    if (gameStatus === "playing" && shuffledWords.length > 0) {
+      setWordData({
+        word: shuffledWords[wordIndex]?.word.toLowerCase(),
+        hint: shuffledWords[wordIndex]?.hint,
+      });
+    }
+  }, [wordIndex, shuffledWords, gameStatus]);
 
   useEffect(() => {
     if (gameStatus === "playing" && timeLeft > 0) {
@@ -51,7 +45,7 @@ function App() {
 
   useEffect(() => {
     if (timeLeft <= 0 && gameStatus === "playing") {
-      setGameStatus("ended");
+      setGameStatus("end");
       clearInterval(tickRef.current);
     }
   }, [timeLeft, gameStatus]);
@@ -59,38 +53,47 @@ function App() {
   useEffect(() => {
     const didWin =
       wordData.word &&
-      wordData.word.split("").every((letter) => guessedLetters.includes(letter));
+      wordData.word
+        .split("")
+        .every((letter) => guessedLetters.includes(letter));
     if (didWin) {
-      setScore((s) => s + 1);
       audioRef.current?.play();
-       setTimeLeft((t) => t + 10); // Add 10 seconds for winning
-      nextWord();
+      setScore((prev) => prev + 1);
+      setTimeout(() => {
+        if (wordIndex + 1 < shuffledWords.length) {
+          setWordIndex((i) => i + 1);
+          setGuessedLetters([]);
+          setWrongGuesses(0);
+          setTimeLeft((t) => t + 10);
+        } else {
+          setGameStatus("end");
+          clearInterval(tickRef.current);
+        }
+      }, 1000);
     }
     if (wrongGuesses >= MAX_WRONG) {
-      nextWord();
+      if (wordIndex + 1 < shuffledWords.length) {
+        setTimeout(() => {
+          setWordIndex((i) => i + 1);
+          setGuessedLetters([]);
+          setWrongGuesses(0);
+        }, 1000);
+      } else {
+        setGameStatus("end");
+        clearInterval(tickRef.current);
+      }
     }
-  }, [guessedLetters, wrongGuesses]);
+  }, [guessedLetters, wrongGuesses, wordData.word, wordIndex, shuffledWords]);
+const getFeedback = () => {
+  const total = WORDS.length;
+  const percent = (score / total) * 100;
 
-  const nextWord = () => {
-    setGuessedLetters([]);
-    setWrongGuesses(0);
-    const nextIdx = (wordIndex + 1) % wordList.length;
-    setWordIndex(nextIdx);
-    setWordData(wordList[nextIdx]);
-  };
-
-  const startGame = () => {
-    const shuffled = shuffle(ORIGINAL_WORDS);
-    setWordList(shuffled);
-    setWordIndex(0);
-    setWordData(shuffled[0]);
-    setTimeLeft(ROUND_TIME);
-    setScore(0);
-    setGuessedLetters([]);
-    setWrongGuesses(0);
-    setGameStatus("playing");
-  };
-
+  if (score === total) return "👑 You are a true Arcian,One latina for you";
+  if (score >= 11) return " Almost flawless,";
+  if (score >= 8) return " Impressive ";
+  if (score >= 5) return " You're getting there! Good effort.";
+  return "😢 Keep learning Arcian";
+};
   const handleGuess = (letter) => {
     if (gameStatus !== "playing" || guessedLetters.includes(letter)) return;
     setGuessedLetters((prev) => [...prev, letter]);
@@ -108,26 +111,38 @@ function App() {
     ));
   };
 
+  const resetGame = () => {
+    const reshuffled = [...WORDS].sort(() => Math.random() - 0.5);
+    setShuffledWords(reshuffled);
+    setWordIndex(0);
+    setGuessedLetters([]);
+    setWrongGuesses(0);
+    setGameStatus("playing");
+    setScore(0);
+    setTimeLeft(ROUND_TIME);
+  };
+
   const letters = "abcdefghijklmnopqrstuvwxyz".split("");
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6">
-      <audio ref={audioRef} src="https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.wav" />
+      <audio ref={audioRef} src={rightanswer} />
 
-      <h1 className="text-4xl text-purple-400 font-bold mb-4 animate-pulse">Arcium Hangman</h1>
-
-      {gameStatus === "start" &&  (
+      {gameStatus === "start" && (
         <div className="text-center">
+          <h1 className="text-4xl text-purple-400 font-bold mb-4 animate-pulse">
+            Arcium Hangman
+          </h1>
           <button
-            onClick={startGame}
-            className="px-8 py-4 text-xl bg-purple-700 hover:bg-purple-800 rounded"
+            onClick={resetGame}
+            className="mt-6 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-lg rounded"
           >
             Start Game
           </button>
         </div>
       )}
 
-      {gameStatus !== "start" && gameStatus !== "ended"  && (
+      {gameStatus === "playing" && (
         <>
           <div className="mb-2 text-purple-300 italic text-center max-w-md">
             Hint: {wordData.hint}
@@ -135,17 +150,19 @@ function App() {
 
           <div className="mb-2 text-yellow-400">Time left: {timeLeft}s</div>
 
-          <div className="mb-4">Wrong guesses: {wrongGuesses} / {MAX_WRONG}</div>
+          <div className="mb-4">
+            Wrong guesses: {wrongGuesses} / {MAX_WRONG}
+          </div>
 
           <div className="mb-6 text-center">{renderWord()}</div>
 
-          <div className="grid grid-cols-7 gap-3 max-w-lg">
+          <div className="grid grid-cols-6 sm:grid-cols-7 gap-2 sm:gap-3 max-w-xs sm:max-w-lg w-full">
             {letters.map((letter) => (
               <button
                 key={letter}
                 onClick={() => handleGuess(letter)}
-                disabled={guessedLetters.includes(letter) || gameStatus !== "playing"}
-                className={`px-4 py-3 rounded text-lg transition ${
+                disabled={guessedLetters.includes(letter)}
+                className={`py-2 sm:py-3 px-3 sm:px-4 text-base sm:text-lg rounded transition ${
                   guessedLetters.includes(letter)
                     ? wordData.word.includes(letter)
                       ? "bg-green-600 animate-bounce"
@@ -160,13 +177,16 @@ function App() {
         </>
       )}
 
-      {gameStatus === "ended" && (
+      {gameStatus === "end" && (
         <div className="mt-6 text-center animate-fade-in">
-          <p className="text-xl text-green-400 font-semibold">
-            Time's up! You guessed {score} word{score !== 1 ? "s" : ""} correctly.
+          <h2 className="text-2xl mb-2">Game Over</h2>
+          <p className="mb-1 font-bold">
+            Total Guessed Words: {score}/{WORDS.length}
           </p>
+          <p className="mb-4 text-purple-300">{getFeedback()}</p>
+
           <button
-            onClick={()=> setGameStatus("start")}
+            onClick={resetGame}
             className="mt-4 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-lg rounded"
           >
             Play Again
